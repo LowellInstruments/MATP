@@ -11,3 +11,7 @@ Log reader for Lowell Instrument's data logger
 2. Add this directory to your PYTHONPATH environment variable
   1. `export PYTHONPATH=.`
 3. Run `$ bin/lid.py <filename>` to convert the binary file to a csv
+
+# License
+
+See LICNESE file (Simplified BSD)
