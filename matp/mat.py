@@ -84,7 +84,8 @@ def get_lookup_tables(axa, axb, mxa, mxs):
     thermometer_values = build_thermometer_values()
     return accelerometer_values, magnetometer_values, thermometer_values
 
-def main(): 
+def main():
+    LINE_BREAK = '\r\n'
     K = 1024
     MAIN_HEADER_SIZE = 32 * K
     DATA_PAGE_SIZE = 1024 * K
@@ -126,18 +127,23 @@ def main():
         patterns_per_page = int(DATA_PAGE_SIZE / p_size)
         
         delta_for_burst = datetime.timedelta(milliseconds=1000/int(mini_header['BMR']))
+        delta_for_pattern = datetime.timedelta(seconds=int(mini_header['TRI']))
         clk_fmt = '%Y-%m-%d %H:%M:%S'
         outfile.write("Date,Time,Ax (g),Ay (g),Az (g),Mx (mG),My (mG),Mz (mG)\n")
         for j in range(num_pages):
             print j
             buffer = StringIO()
             infile.seek(MAIN_HEADER_SIZE + DATA_PAGE_SIZE * j, os.SEEK_SET)
-            mini_header_bytes = infile.read(mh_bytes)
-            mh = parse_header(mini_header_bytes)
+            data_page = infile.read(DATA_PAGE_SIZE)
+            mh = parse_header(data_page[:mh_bytes])
+            data_page = data_page[mh_bytes:]
+            patterns_in_page = int(len(data_page)/p_size)
             clk = datetime.datetime.strptime(mh['CLK'], clk_fmt)
-            for i in range(patterns_per_page):
-                data_bytes = infile.read(p_size)
-                a = struct.unpack_from(p, data_bytes)
+            for i in range(patterns_in_page):
+                start = i*p_size
+                stop = start + p_size
+                a = struct.unpack_from(p, data_page[start:stop])
+
                 # ignore temp for now
                 ax = map(lambda x: ACCELS[x], a[1::6])
                 ay = map(lambda x: ACCELS[x], a[2::6])
@@ -146,7 +152,10 @@ def main():
                 my = map(lambda x: MAGNES[x], a[5::6])
                 mz = map(lambda x: MAGNES[x], a[6::6])
                 vs = ("%s" % (clk + delta_for_burst * k).isoformat(',') for k in range(len(ax)))
-                buffer.write("\n".join(["%s,%s,%s,%s,%s,%s,%s" % t for t in zip(vs, ax, ay, az, mx, my, mz)]))
+                buffer.write(LINE_BREAK.join(["%s,%s,%s,%s,%s,%s,%s" % t for t in zip(vs, ax, ay, az, mx, my, mz)]))
+                buffer.write(LINE_BREAK)
+                # After each pattern, a certain time has elapsed
+                clk += delta_for_pattern
             outfile.write(buffer.getvalue())
             buffer.close()
 
