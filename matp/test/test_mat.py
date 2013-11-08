@@ -11,6 +11,168 @@ class TimerTestCase(unittest.TestCase):
         t = time.time() - self.start
         print "%s: %.3f" % (self.id(), t)
 
+class PatternTestCase(TimerTestCase):
+    def setUp(self):
+        super(PatternTestCase, self).setUp()
+
+    def test_simple_pattern(self):
+        '''using same ORI and TRI and all measurements'''
+        expected = '<H6h'
+        tri = 1
+        ori = 1
+        acl = True
+        mgn = True
+        tmp = True
+        bmn = 1
+        pattern = mat.pattern(bmn, tri=tri, ori=ori, acl=acl, mgn=mgn, tmp=tmp)
+        self.assertEqual(pattern, expected)
+
+    def test_big_pattern(self):
+        '''use the same input as the big file'''
+        expected = '<H5760h'
+        tri = 60
+        ori = 60
+        acl = True
+        mgn = True
+        tmp = True
+        bmn = 960
+        pattern = mat.pattern(bmn, tri=tri, ori=ori, acl=acl, mgn=mgn, tmp=tmp)
+        self.assertEqual(pattern, expected)
+
+    def test_spec_pattern(self):
+        '''use the input as shown in the spec'''
+        expected = '<H30h'
+        tri = 60
+        ori = 30
+        acl = True
+        mgn = True
+        tmp = True
+        bmn = 5
+        pattern = mat.pattern(bmn, tri=tri, ori=ori, acl=acl, mgn=mgn, tmp=tmp)
+        self.assertEqual(pattern, expected)
+
+    def test_extreme_pttern(self):
+        '''use the endpoints of BMN'''
+        expected = '<H393216h'
+        tri = 60
+        ori = 30
+        acl = True
+        mgn = True
+        tmp = True
+        bmn = 65536
+        pattern = mat.pattern(bmn, tri=tri, ori=ori, acl=acl, mgn=mgn, tmp=tmp)
+        self.assertEqual(pattern, expected)
+
+    def test_ori_bigger_than_tri(self):
+        '''use a tri value smaller than ori'''
+        expected = '<H6h5H'
+        tri = 10
+        ori = 60
+        acl = True
+        mgn = True
+        tmp = True
+        bmn = 1
+        pattern = mat.pattern(bmn, tri=tri, ori=ori, acl=acl, mgn=mgn, tmp=tmp)
+        self.assertEqual(pattern, expected)
+
+class GetOriFormatTestCase(TimerTestCase):
+    def setUp(self):
+        super(GetOriFormatTestCase, self).setUp()
+        
+    def test_all_measurements(self):
+        '''Should return 7 %s'''
+        accel = '1'
+        magne = '1'
+        fmt = mat.get_orientation_format(accel=accel, magne=magne)
+        expected = ','.join(['%s'] * 7)
+        self.assertEqual(fmt, expected)
+
+    def test_only_magne(self):
+        '''should return 4 %s'''
+        accel = '0'
+        magne = '1'
+        fmt = mat.get_orientation_format(accel=accel, magne=magne)
+        expected = ','.join(['%s'] * 4)
+        self.assertEqual(fmt, expected)
+
+    def test_only_accel(self):
+        '''should return 4 %s'''
+        accel = '1'
+        magne = '0'
+        fmt = mat.get_orientation_format(accel=accel, magne=magne)
+        expected = ','.join(['%s'] * 4)
+        self.assertEqual(fmt, expected)
+        
+
+class GetTmpCSVHeadersTestCase(TimerTestCase):
+    def setUp(self):
+        super(GetTmpCSVHeadersTestCase, self).setUp()
+        self.datetime_header = "Date,Time"
+        self.temp = "Temperature (C)"
+
+    def test_temp(self):
+        '''should return datetime and temperature and linebreak'''
+        temp = '1'
+        ori_header = mat.get_tmp_csv_headers(temp=temp)
+        self.assertIn(self.datetime_header, ori_header)
+        self.assertIn(self.temp, ori_header)
+        self.assertEqual(mat.LINE_BREAK, ori_header[ori_header.rfind(mat.LINE_BREAK):])
+
+    def test_no_temp(self):
+        '''should only return datetime'''
+        temp = '0'
+        ori_header = mat.get_tmp_csv_headers(temp=temp)
+        self.assertIn(self.datetime_header, ori_header)
+        self.assertNotIn(self.temp, ori_header)
+        self.assertEqual(mat.LINE_BREAK, ori_header[ori_header.rfind(mat.LINE_BREAK):])
+
+class GetOriCSVHeadersTestCase(TimerTestCase):
+    def setUp(self):
+        super(GetOriCSVHeadersTestCase, self).setUp()
+        self.datetime_header = "Date,Time"
+        self.accel_header = "Ax (g),Ay (g),Az (g)"
+        self.magne_header = "Mx (mG),My (mG),Mz (mG)"
+
+    def test_both_measurements(self):
+        '''Should return a time and 3 acl and 3 mgn headers and end in linebreak'''
+        accel = '1'
+        magne = '1'
+        ori_header = mat.get_ori_csv_headers(accel=accel, magne=magne)
+        self.assertIn(self.datetime_header, ori_header)
+        self.assertIn(self.accel_header, ori_header)
+        self.assertIn(self.magne_header, ori_header)
+        self.assertEqual(mat.LINE_BREAK, ori_header[ori_header.rfind(mat.LINE_BREAK):])
+
+    def test_only_accel(self):
+        '''Should only return time and accel headers'''
+        accel = '1'
+        magne = '0'
+        ori_header = mat.get_ori_csv_headers(accel=accel, magne=magne)
+        self.assertIn(self.datetime_header, ori_header)
+        self.assertIn(self.accel_header, ori_header)
+        self.assertNotIn(self.magne_header, ori_header)
+        self.assertEqual(mat.LINE_BREAK, ori_header[ori_header.rfind(mat.LINE_BREAK):])
+
+    def test_only_magne(self):
+        '''should only return time and magne headers'''
+        accel = '0'
+        magne = '1'
+        ori_header = mat.get_ori_csv_headers(accel=accel, magne=magne)
+        self.assertIn(self.datetime_header, ori_header)
+        self.assertNotIn(self.accel_header, ori_header)
+        self.assertIn(self.magne_header, ori_header)
+        self.assertEqual(mat.LINE_BREAK, ori_header[ori_header.rfind(mat.LINE_BREAK):])
+
+    def test_neither(self):
+        '''should return just the date header'''
+        accel = '0'
+        magne = '0'
+        ori_header = mat.get_ori_csv_headers(accel=accel, magne=magne)
+        self.assertIn(self.datetime_header, ori_header)
+        self.assertNotIn(self.accel_header, ori_header)
+        self.assertNotIn(self.magne_header, ori_header)
+        self.assertEqual(mat.LINE_BREAK, ori_header[ori_header.rfind(mat.LINE_BREAK):])
+
 class ParseMainHeaderTestCase(TimerTestCase):
     def setUp(self):
         super(ParseMainHeaderTestCase, self).setUp()
