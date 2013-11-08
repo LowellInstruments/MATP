@@ -387,7 +387,7 @@ def parse_file(lid_filename, orientation_filename, temperature_filename, default
     data_size = file_size - MAIN_HEADER_SIZE
     # The number of data pages that fit in this data
     num_pages = int(math.ceil(data_size/DATA_PAGE_SIZE))
-    with open(lid_filename) as lid, open(orientation_filename, 'w') as ori:
+    with open(lid_filename, 'rb') as lid, open(orientation_filename, 'w') as ori:
         header_bytes = lid.read(MAIN_HEADER_SIZE)
         header, mini_header, hss, mh_size = parse_main_header(header_bytes)
 
