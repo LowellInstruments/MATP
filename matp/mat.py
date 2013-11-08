@@ -193,8 +193,47 @@ def pattern(bmn, ori=1, tri=1, tmp=True, acl=True, mgn=True):
     if mgn:
         num += 3
 
-    return endian + temp + str(bmn * num) + o
-    
+    mul = int(tri/ori)
+
+    return endian + temp + str(bmn * num * mul) + o
+
+
+'''Given a data frame, translate it and write to the buffer'''
+def all_data_to_buffers(a, tmp_buffer=None, ori_buffer=None,
+                        accels=None, magnes=None, temps=None, clk=None,
+                        tri=None, ori=None, p_size=None, ori_delta=None,
+                        burst_delta=None, orientation_format=None):
+    temp_value = a[0]
+    a = a[1:]
+
+    tmp_buffer.write(
+        "%s,%s%s" % (
+            clk.isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS], 
+            temps[temp_value],
+            LINE_BREAK
+        )
+    )   
+    ori_p_size = int((p_size - 2)/(tri/ori)/2) # divide by size of short
+    for j in xrange(int(len(a)/ori_p_size)):
+        left = ori_p_size * j
+        right = ori_p_size * j + ori_p_size
+        d = a[left:right]
+        ax = [accels[x] for x in d[0::6]]
+        ay = [accels[x] for x in d[1::6]]
+        az = [accels[x] for x in d[2::6]]
+        mx = [magnes[x] for x in d[3::6]]
+        my = [magnes[x] for x in d[4::6]]
+        mz = [magnes[x] for x in d[5::6]]
+        vs = ["%s" % (clk + burst_delta * k).isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS] for k in xrange(int(len(d)/6))]
+        ori_buffer.write(
+            LINE_BREAK.join(
+                [orientation_format % row for row in itertools.izip(vs, ax, ay, az, mx, my, mz)]
+            )
+        )
+        ori_buffer.write(LINE_BREAK)
+        clk += ori_delta
+    return
+        
 
 '''The choice to return a closure is that I don't want
 to abstract the common bits because this loop runs so many times.
@@ -205,9 +244,10 @@ the python overhead of calling functions hundreds of thousands of times.
 The choice to use closures vs objects just feels more natural in this
 situation.
 '''
-def get_data_page_parser(burst_delta=None, pattern_delta=None,
+def get_data_page_parser(burst_delta=None, ori_delta=None, tmp_delta=None,
                          orientation_format=None, temps=None, 
-                         accels=None, magnes=None, tmp=None, acl=None, mgn=None):
+                         accels=None, magnes=None, tmp=None, acl=None, mgn=None,
+                         tri=None, ori=None):
     '''Return the parser function to parse this specific type of data'''
 
     '''This is for only a temperature measurement
@@ -232,7 +272,7 @@ def get_data_page_parser(burst_delta=None, pattern_delta=None,
             )
 
             # After each pattern, a certain time has elapsed
-            clk += pattern_delta
+            clk += tmp_delta
 
     '''This is for no_a and tri > ori'''
     def no_a_ori_lte_tri(data_page, patterns_in_page=None,
@@ -264,7 +304,7 @@ def get_data_page_parser(burst_delta=None, pattern_delta=None,
             ori_buffer.write(LINE_BREAK)
             
             # After each pattern, a certain time has elapsed
-            clk += pattern_delta
+            clk += tmp_delta
 
     '''This is for no magnetometer and tri >= ori'''
     def no_m_ori_lte_tri(data_page, patterns_in_page=None,
@@ -296,7 +336,7 @@ def get_data_page_parser(burst_delta=None, pattern_delta=None,
             ori_buffer.write(LINE_BREAK)
             
             # After each pattern, a certain time has elapsed
-            clk += pattern_delta
+            clk += tmp_delta
 
     '''This is for all measurements and tri >= ori'''
     def all_ori_lte_tri(data_page, patterns_in_page=None,
@@ -305,33 +345,26 @@ def get_data_page_parser(burst_delta=None, pattern_delta=None,
         for i in xrange(patterns_in_page):
             start = i * p_size
             stop = start + p_size
+
+            if len(data_page[start:stop]) < p_size:
+                # we need an entirely new pattern if this is the case
+                new_p = '<H' + str(int(len(data_page[start:])/2)-1) + 'h'
+                a = struct.unpack_from(new_p, data_page[start:])
+                # TODO: \xff * 14 might come halfway in the page
+                end_index = data_page[start:].rfind('\xff' * 14)
+                if end_index > -1:
+                    return
+                all_data_to_buffers(a, tmp_buffer=tmp_buffer, ori_buffer=ori_buffer,
+                                    accels=accels, magnes=magnes, temps=temps, clk=clk,
+                                    tri=tri, ori=ori, p_size=p_size, ori_delta=ori_delta,
+                                    burst_delta=burst_delta, orientation_format=orientation_format)
+                return
             a = struct.unpack_from(p, data_page[start:stop])
-            
-            tmp_buffer.write(
-                "%s,%s%s" % (
-                    clk.isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS], 
-                    temps[a[0]],
-                    LINE_BREAK
-                )
-            )
-            
-            ax = [accels[x] for x in a[1::6]]
-            ay = [accels[x] for x in a[2::6]]
-            az = [accels[x] for x in a[3::6]]
-            mx = [magnes[x] for x in a[4::6]]
-            my = [magnes[x] for x in a[5::6]]
-            mz = [magnes[x] for x in a[6::6]]
-            vs = ["%s" % (clk + burst_delta * k).isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS] for k in xrange(int(len(a)/6))]
-            
-            ori_buffer.write(
-                LINE_BREAK.join(
-                    [orientation_format % row for row in itertools.izip(vs, ax, ay, az, mx, my, mz)]
-                )
-            )
-            ori_buffer.write(LINE_BREAK)
-            
-            # After each pattern, a certain time has elapsed
-            clk += pattern_delta
+            all_data_to_buffers(a, tmp_buffer=tmp_buffer, ori_buffer=ori_buffer,
+                                accels=accels, magnes=magnes, temps=temps, clk=clk,
+                                tri=tri, ori=ori, p_size=p_size, ori_delta=ori_delta,
+                                burst_delta=burst_delta, orientation_format=orientation_format)
+            clk += tmp_delta
 
     if tmp and acl and mgn:
         print "Returning all_ori_lte_tri"
@@ -382,22 +415,27 @@ def parse_file(lid_filename, orientation_filename, temperature_filename, default
 
         # we might need orientation if TRI < ORI
         temperature_interval = int(mini_header['TRI'])
+        orientation_interval = int(mini_header['ORI'])
         burst_mode_rate = int(mini_header['BMR'])
         burst_delta = datetime.timedelta(milliseconds=1000/burst_mode_rate)
         # TODO: get pattern delta, might not be TRI
-        pattern_delta = datetime.timedelta(seconds=temperature_interval)
+        orientation_delta = datetime.timedelta(seconds=orientation_interval)
+        temperature_delta = datetime.timedelta(seconds=temperature_interval)
 
         # File I/O
         ori.write(ori_csv_headers)
         tmp_buffer = StringIO()
 
         parse_data_page = get_data_page_parser(burst_delta=burst_delta, 
-                                               pattern_delta=pattern_delta,
+                                               ori_delta=orientation_delta,
+                                               tmp_delta=temperature_delta,
                                                orientation_format=orientation_format,
                                                temps=temps, accels=accels, magnes=magnes,
                                                tmp=bool(int(mini_header['TMP'])),
                                                acl=bool(int(mini_header['ACL'])), 
-                                               mgn=bool(int(mini_header['MGN'])))
+                                               mgn=bool(int(mini_header['MGN'])),
+                                               tri=int(mini_header['TRI']),
+                                               ori=int(mini_header['ORI']),)
 
 
         for page_number in xrange(num_pages):
@@ -415,7 +453,8 @@ def parse_file(lid_filename, orientation_filename, temperature_filename, default
 
             # TODO: look for \xff\xff\xff\xff
             data_page = data_page[mh_size:]
-            patterns_in_page = int(len(data_page)/p_size)
+
+            patterns_in_page = int(math.ceil((len(data_page)/p_size)))
 
             # Add a microsecond here to get the .000.
             # Does not effect rounding because it gets chopped off

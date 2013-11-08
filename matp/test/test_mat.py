@@ -41,7 +41,7 @@ class PatternTestCase(TimerTestCase):
 
     def test_spec_pattern(self):
         '''use the input as shown in the spec'''
-        expected = '<H30h'
+        expected = '<H60h'
         tri = 60
         ori = 30
         acl = True
@@ -53,7 +53,7 @@ class PatternTestCase(TimerTestCase):
 
     def test_extreme_pttern(self):
         '''use the endpoints of BMN'''
-        expected = '<H393216h'
+        expected = '<H786432h'
         tri = 60
         ori = 30
         acl = True
@@ -63,6 +63,20 @@ class PatternTestCase(TimerTestCase):
         pattern = mat.pattern(bmn, tri=tri, ori=ori, acl=acl, mgn=mgn, tmp=tmp)
         self.assertEqual(pattern, expected)
 
+    def test_complex_pattern(self):
+        '''use the complex pattern provided'''
+        expected = '<H3072h'
+        tri = 20
+        ori = 5
+        acl = True
+        mgn = True
+        tmp = True
+        bmn = 128
+        pattern = mat.pattern(bmn, tri=tri, ori=ori, acl=acl, mgn=mgn, tmp=tmp)
+        self.assertEqual(pattern, expected)
+
+    
+    @unittest.skip("not implemented yet")
     def test_ori_bigger_than_tri(self):
         '''use a tri value smaller than ori'''
         expected = '<H6h5H'
