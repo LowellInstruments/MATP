@@ -27,7 +27,7 @@ See LICNESE file (Simplified BSD)
 6. run `bin\lid.py path/to/data/file.lid 1`
 7. Check output of out.csv and tmp.csv
 
-Note: that extra 1 indicates you want to use default host storage. I haven't built in a flag parser yet
-so I'm using 1 to represent "use default host storage".
+Note: that extra 1 indicates you want to use default host storage.
+I haven't built in a flag parser yet so I'm using 1 to represent "use default host storage".
 
 We have to use default host storage because a lot of the data files have mis-calibrated MXS/MYS/MZS values.
