@@ -70,7 +70,7 @@ def parse_hss(hss_bytes):
         if tag == 'HSE':
             break
         # l is the length of the value to follow
-        length = ord(hss_bytes[offset+3:offset+4])
+        length = int(hss_bytes[offset+3:offset+4], 16)
         val = hss_bytes[offset+4:offset+4+length]
         offset += 4 + length
         hss[tag] = val
@@ -82,6 +82,7 @@ def parse_hss(hss_bytes):
     for tag in float_tags:
         if tag in hss:
             hss[tag] = float(hss[tag])
+
     return hss
 
 def parse_main_header(header_bytes):
@@ -176,7 +177,6 @@ def get_orientation_format(accel='1', magne='1'):
 
 def pattern(bmn, ori=1, tri=1, tmp=True, acl=True, mgn=True):
     '''Build the pattern for reading data.
-
     This pattern is the major and all the minors up to the next major.
     '''
     endian = '<'
@@ -193,26 +193,28 @@ def pattern(bmn, ori=1, tri=1, tmp=True, acl=True, mgn=True):
     if mgn:
         num += 3
 
+    if tri < ori:
+        mul = int(ori/tri)
+        return endian + temp + str(bmn * num) + o + str(mul-1) + temp
     mul = int(tri/ori)
-
     return endian + temp + str(bmn * num * mul) + o
 
 
-'''Given a data frame, translate it and write to the buffer'''
+'''write orientation data and temperature data to the buffers'''
 def all_data_to_buffers(a, tmp_buffer=None, ori_buffer=None,
                         accels=None, magnes=None, temps=None, clk=None,
                         tri=None, ori=None, p_size=None, ori_delta=None,
                         burst_delta=None, orientation_format=None):
     temp_value = a[0]
     a = a[1:]
-
     tmp_buffer.write(
         "%s,%s%s" % (
             clk.isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS], 
             temps[temp_value],
             LINE_BREAK
         )
-    )   
+    )
+    # orientation pattern size
     ori_p_size = int((p_size - 2)/(tri/ori)/2) # divide by size of short
     for j in xrange(int(len(a)/ori_p_size)):
         left = ori_p_size * j
@@ -346,6 +348,7 @@ def get_data_page_parser(burst_delta=None, ori_delta=None, tmp_delta=None,
             start = i * p_size
             stop = start + p_size
 
+            # This happens at the last section of the data page.
             if len(data_page[start:stop]) < p_size:
                 # we need an entirely new pattern if this is the case
                 new_p = '<H' + str(int(len(data_page[start:])/2)-1) + 'h'
@@ -366,9 +369,17 @@ def get_data_page_parser(burst_delta=None, ori_delta=None, tmp_delta=None,
                                 burst_delta=burst_delta, orientation_format=orientation_format)
             clk += tmp_delta
 
+    def all_ori_gt_tri(data_page, patterns_in_page=None,
+                       p=None, p_size=None, clk=None, ori_buffer=None,
+                       tmp_buffer=None):
+        pass
+
     if tmp and acl and mgn:
-        print "Returning all_ori_lte_tri"
-        return all_ori_lte_tri
+        if ori <= tri:
+            print "Returning all_ori_lte_tri"
+            return all_ori_lte_tri
+        print "Returning all_ori_gt_tri"
+        return all_ori_gt_tri
     
     if tmp and acl and not mgn:
         print "Returning no_m_ori_lte_tri"
@@ -410,10 +421,8 @@ def parse_file(lid_filename, orientation_filename, temperature_filename, default
                     tmp=bool(int(mini_header['TMP'])), 
                     acl=bool(int(mini_header['ACL'])), 
                     mgn=bool(int(mini_header['MGN'])))
-
         p_size = struct.calcsize(p)
-
-        # we might need orientation if TRI < ORI
+        # we might need orientation_interval if TRI < ORI
         temperature_interval = int(mini_header['TRI'])
         orientation_interval = int(mini_header['ORI'])
         burst_mode_rate = int(mini_header['BMR'])

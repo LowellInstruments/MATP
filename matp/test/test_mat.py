@@ -74,18 +74,27 @@ class PatternTestCase(TimerTestCase):
         bmn = 128
         pattern = mat.pattern(bmn, tri=tri, ori=ori, acl=acl, mgn=mgn, tmp=tmp)
         self.assertEqual(pattern, expected)
-
     
-    @unittest.skip("not implemented yet")
     def test_ori_bigger_than_tri(self):
         '''use a tri value smaller than ori'''
-        expected = '<H6h5H'
-        tri = 10
+        expected = '<H12h59H'
+        tri = 1
         ori = 60
         acl = True
         mgn = True
         tmp = True
-        bmn = 1
+        bmn = 2
+        pattern = mat.pattern(bmn, tri=tri, ori=ori, acl=acl, mgn=mgn, tmp=tmp)
+        self.assertEqual(pattern, expected)
+    
+    def test_ori_bigger_than_tri_more(self):
+        expected ='<H24h5H'
+        tri = 5
+        ori = 30
+        acl = True
+        mgn = True
+        tmp = True
+        bmn = 4
         pattern = mat.pattern(bmn, tri=tri, ori=ori, acl=acl, mgn=mgn, tmp=tmp)
         self.assertEqual(pattern, expected)
 
@@ -248,13 +257,21 @@ class TestBuildAccelerometerValues(TimerTestCase):
 class TestBuildMagnetometerValues(TimerTestCase):
     def setUp(self):
         super(TestBuildMagnetometerValues, self).setUp()
-        self.a = 0
-        self.s = 0.91743
+
 
     def test_number_of_values(self):
         '''there should be 2^16 (two bytes) of values'''
-        m = mat.build_magnetometer_values(self.a, self.s)
+        a = 0
+        s = 0.91743
+        m = mat.build_magnetometer_values(a, s)
         self.assertEqual(len(m), 2**16)
+
+    def test_a_point(self):
+        '''A few test cases to make sure it's working'''
+        a = 0
+        s = 1
+        m = mat.build_magnetometer_values(a, s)
+        self.assertEqual(m[508], '508.00')
 
 class TestBuildThermometerValues(TimerTestCase):
     def test_number_of_values(self):
