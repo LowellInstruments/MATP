@@ -391,24 +391,26 @@ def get_data_page_parser(burst_delta=None, ori_delta=None, tmp_delta=None,
 
         
 def parse_file(lid_filename, orientation_filename, temperature_filename, default_host_storage=False):
+    # Microsecond is used to add a bit of time to a number to get decimal points. 
     microsecond = datetime.timedelta(microseconds=1)
+
     # Entire file is this big (bytes)
     file_size = os.path.getsize(lid_filename)
-    # Size of data (miniheaders are data)
+
+    # Size of data (miniheaders are data) (filesize less header)
     data_size = file_size - MAIN_HEADER_SIZE
+
     # The number of data pages that fit in this data
     num_pages = int(math.ceil(data_size/DATA_PAGE_SIZE))
     with open(lid_filename, 'rb') as lid, open(orientation_filename, 'w') as ori:
         header_bytes = lid.read(MAIN_HEADER_SIZE)
         header, mini_header, hss, mh_size = parse_main_header(header_bytes)
-
+        
         # TODO: hopefully this can go away
         if default_host_storage:
             hss = DEFAULT_HOST_STORAGE
 
         # Get everything that requires the main/mini header data/hss
-
-        # TODO: pass things to these functions
         ori_csv_headers = get_ori_csv_headers(accel=mini_header['ACL'], magne=mini_header['MGN'])
         tmp_csv_headers = get_tmp_csv_headers(temp=mini_header['TMP'])
         orientation_format = get_orientation_format(accel=mini_header['ACL'], magne=mini_header['MGN'])
