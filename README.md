@@ -1,6 +1,6 @@
 # MATP
 
-Log reader for Lowell Instrument's data logger
+Log reader for Lowell Instrument's data logger.
 
 # Usage
 
