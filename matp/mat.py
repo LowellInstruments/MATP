@@ -36,7 +36,6 @@ DEFAULT_HOST_STORAGE = {
     'TMC': 0.0000000848361,
 }
 
-LINE_BREAK = '\r\n'
 HEADER_SEPARATOR = '\x0d\x0a'
 
 ISO_SEPARATOR = ','
@@ -161,7 +160,7 @@ def get_ori_csv_headers(accel='1', magne='1'):
         headers.append(accel_header)
     if magne == '1':
         headers.append(magne_header)
-    return ','.join(headers) + LINE_BREAK
+    return ','.join(headers) + os.linesep
 
 def get_tmp_csv_headers(temp='1'):
     '''Returns the header for the Temperature CSV file'''
@@ -170,7 +169,7 @@ def get_tmp_csv_headers(temp='1'):
     headers = [date_header]
     if temp == '1':
         headers.append(temp_header)
-    return ','.join(headers) + LINE_BREAK
+    return ','.join(headers) + os.linesep
     
 def get_orientation_format(accel='1', magne='1'):
     '''returns the format for the orientation csv file'''
@@ -220,7 +219,7 @@ def write_orientation(ori_data, ori_buffer=None, clk=None, accels=None, magnes=N
                                   magnes[d[3]], magnes[d[4]], magnes[d[5]])
         )
         ori_buffer.write(
-            LINE_BREAK
+            os.linesep
         )
         clk += burst_delta
 
@@ -231,7 +230,7 @@ def write_temperature(tmp_data, tmp_buffer=None, temps=None, clk=None, tmp_delta
             "%s,%s%s" % (
                 clk.isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS],
                 temps[t],
-                LINE_BREAK,
+                os.linesep,
             )
         )
         clk += tmp_delta
@@ -268,7 +267,7 @@ def get_data_page_parser(burst_delta=None, ori_delta=None, tmp_delta=None,
                 "%s,%s%s" % (
                     clk.isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS], 
                     temps[a[0]],
-                    LINE_BREAK
+                    os.linesep,
                 )
             )
 
@@ -288,7 +287,7 @@ def get_data_page_parser(burst_delta=None, ori_delta=None, tmp_delta=None,
                 "%s,%s%s" % (
                     clk.isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS], 
                     temps[a[0]],
-                    LINE_BREAK
+                    os.linesep,
                 )
             )
             
@@ -298,11 +297,11 @@ def get_data_page_parser(burst_delta=None, ori_delta=None, tmp_delta=None,
             vs = ["%s" % (clk + burst_delta * k).isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS] for k in xrange(int(len(a)/3))]
             
             ori_buffer.write(
-                LINE_BREAK.join(
+                os.linesep.join(
                     [orientation_format % row for row in itertools.izip(vs, mx, my, mz)]
                 )
             )
-            ori_buffer.write(LINE_BREAK)
+            ori_buffer.write(os.linesep)
             
             # After each pattern, a certain time has elapsed
             clk += tmp_delta
@@ -320,7 +319,7 @@ def get_data_page_parser(burst_delta=None, ori_delta=None, tmp_delta=None,
                 "%s,%s%s" % (
                     clk.isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS], 
                     temps[a[0]],
-                    LINE_BREAK
+                    os.linesep,
                 )
             )
             
@@ -330,11 +329,11 @@ def get_data_page_parser(burst_delta=None, ori_delta=None, tmp_delta=None,
             vs = ["%s" % (clk + burst_delta * k).isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS] for k in xrange(int(len(a)/3))]
             
             ori_buffer.write(
-                LINE_BREAK.join(
+                os.linesep.join(
                     [orientation_format % row for row in itertools.izip(vs, ax, ay, az)]
                 )
             )
-            ori_buffer.write(LINE_BREAK)
+            ori_buffer.write(os.linesep)
             
             # After each pattern, a certain time has elapsed
             clk += tmp_delta
