@@ -182,6 +182,7 @@ def get_orientation_format(accel='1', magne='1'):
         number += 3
     return ','.join(fmt * number)
 
+# TODO: This looks like it needs refactoring. It's pretty non-intuitive.
 def pattern(bmn, ori=1, tri=1, tmp=True, acl=True, mgn=True):
     '''Build the pattern for reading data.
     This pattern is the major and all the minors up to the next major.
@@ -206,43 +207,34 @@ def pattern(bmn, ori=1, tri=1, tmp=True, acl=True, mgn=True):
     mul = int(tri/ori)
     return endian + temp + str(bmn * num * mul) + o
 
-
-'''write orientation data and temperature data to the buffers'''
-def all_data_to_buffers(a, tmp_buffer=None, ori_buffer=None,
-                        accels=None, magnes=None, temps=None, clk=None,
-                        tri=None, ori=None, p_size=None, ori_delta=None,
-                        burst_delta=None, orientation_format=None):
-    temp_value = a[0]
-    a = a[1:]
-    tmp_buffer.write(
-        "%s,%s%s" % (
-            clk.isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS], 
-            temps[temp_value],
+def write_orientation(ori_data, ori_buffer=None, clk=None, accels=None, magnes=None, ori_delta=None, 
+                      burst_delta=None, bmn=None, orientation_format=None):
+    '''Write the orientation data to the orientation buffer'''
+    for i in xrange(bmn):
+        left = 6 * i
+        right = 6 * (i + 1)
+        d = ori_data[left:right]
+        ori_buffer.write(
+            orientation_format % (clk.isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS], 
+                                  accels[d[0]], accels[d[1]], accels[d[2]], 
+                                  magnes[d[3]], magnes[d[4]], magnes[d[5]])
+        )
+        ori_buffer.write(
             LINE_BREAK
         )
-    )
-    # orientation pattern size
-    ori_p_size = int((p_size - 2)/(tri/ori)/2) # divide by size of short
-    for j in xrange(int(len(a)/ori_p_size)):
-        left = ori_p_size * j
-        right = ori_p_size * j + ori_p_size
-        d = a[left:right]
-        ax = [accels[x] for x in d[0::6]]
-        ay = [accels[x] for x in d[1::6]]
-        az = [accels[x] for x in d[2::6]]
-        mx = [magnes[x] for x in d[3::6]]
-        my = [magnes[x] for x in d[4::6]]
-        mz = [magnes[x] for x in d[5::6]]
-        vs = ["%s" % (clk + burst_delta * k).isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS] for k in xrange(int(len(d)/6))]
-        ori_buffer.write(
-            LINE_BREAK.join(
-                [orientation_format % row for row in itertools.izip(vs, ax, ay, az, mx, my, mz)]
+        clk += burst_delta
+
+def write_temperature(tmp_data, tmp_buffer=None, temps=None, clk=None, tmp_delta=None):
+    '''Write the tmp data to the temperature buffer'''
+    for t in tmp_data:
+        tmp_buffer.write(
+            "%s,%s%s" % (
+                clk.isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS],
+                temps[t],
+                LINE_BREAK,
             )
         )
-        ori_buffer.write(LINE_BREAK)
-        clk += ori_delta
-    return
-        
+        clk += tmp_delta
 
 '''The choice to return a closure is that I don't want
 to abstract the common bits because this loop runs so many times.
@@ -256,7 +248,7 @@ situation.
 def get_data_page_parser(burst_delta=None, ori_delta=None, tmp_delta=None,
                          orientation_format=None, temps=None, 
                          accels=None, magnes=None, tmp=None, acl=None, mgn=None,
-                         tri=None, ori=None):
+                         tri=None, ori=None, bmn=None):
     '''Return the parser function to parse this specific type of data'''
 
     '''This is for only a temperature measurement
@@ -359,27 +351,61 @@ def get_data_page_parser(burst_delta=None, ori_delta=None, tmp_delta=None,
             if len(data_page[start:stop]) < p_size:
                 # we need an entirely new pattern if this is the case
                 new_p = '<H' + str(int(len(data_page[start:])/2)-1) + 'h'
-                a = struct.unpack_from(new_p, data_page[start:])
                 # TODO: \xff * 14 might come halfway in the page
                 end_index = data_page[start:].rfind('\xff' * 14)
                 if end_index > -1:
                     return
-                all_data_to_buffers(a, tmp_buffer=tmp_buffer, ori_buffer=ori_buffer,
-                                    accels=accels, magnes=magnes, temps=temps, clk=clk,
-                                    tri=tri, ori=ori, p_size=p_size, ori_delta=ori_delta,
-                                    burst_delta=burst_delta, orientation_format=orientation_format)
-                return
-            a = struct.unpack_from(p, data_page[start:stop])
-            all_data_to_buffers(a, tmp_buffer=tmp_buffer, ori_buffer=ori_buffer,
-                                accels=accels, magnes=magnes, temps=temps, clk=clk,
-                                tri=tri, ori=ori, p_size=p_size, ori_delta=ori_delta,
-                                burst_delta=burst_delta, orientation_format=orientation_format)
+                a = struct.unpack_from(new_p, data_page[start:])
+            else:
+                a = struct.unpack_from(p, data_page[start:stop])
+            
+            t_data = a[0:1]
+            o_data = a[1:]
+            write_temperature(t_data, tmp_buffer=tmp_buffer, temps=temps, clk=clk,
+                              tmp_delta=tmp_delta)
+            write_orientation(o_data, ori_buffer=ori_buffer, clk=clk, accels=accels,
+                              manges=magnes, ori_delta=ori_delta, burst_delta=burst_delta,
+                              bmn=bmn, orientation_format=orientation_format)
             clk += tmp_delta
+
 
     def all_ori_gt_tri(data_page, patterns_in_page=None,
                        p=None, p_size=None, clk=None, ori_buffer=None,
-                       tmp_buffer=None):
-        pass
+                       tmp_buffer=None, bmn=bmn):
+        for i in xrange(patterns_in_page):
+            start = i * p_size
+            stop = start + p_size
+            if len(data_page[start:stop]) < p_size:
+                # get the number of remaining bytes
+                remaining = len(data_page[start:stop])
+                # get number of h bytes needed in original pattern
+                h_index = p.rindex('h')
+                # <H12h59H => H + 12 h = 13
+                hs = int(p[2:h_index]) + 1
+                # No partial intervals are allowed:
+                if hs * 2 > remaining:
+                    # pull out one temp
+                    return
+                # 60 / 2 = 30 (since each short is 2 bytes)
+                # 30 - 13 = 17 H measurements remaining
+                new_p = p[:h_index+1] + str(int(remaining/2) - hs) + 'H'
+                end_index = data_page[start:].rfind('\xff' * 14)
+                if end_index > -1:
+                    return
+                a = struct.unpack_from(new_p, data_page[start:])
+            else:
+                a = struct.unpack_from(p, data_page[start:stop])
+            
+            t_data = a[0:1] + a[bmn*6+1:]
+            o_data = a[1:bmn * 6 + 1]
+            
+            write_temperature(t_data, tmp_buffer=tmp_buffer, temps=temps, clk=clk,
+                              tmp_delta=tmp_delta)
+            write_orientation(o_data, ori_buffer=ori_buffer, clk=clk, accels=accels,
+                              magnes=magnes, ori_delta=ori_delta, burst_delta=burst_delta,
+                              bmn=bmn, orientation_format=orientation_format)
+
+            clk += ori_delta
 
     if tmp and acl and mgn:
         if ori <= tri:
@@ -411,7 +437,7 @@ def parse_file(lid_filename, ori_fh, temp_fh, default_host_storage=False, debugg
 
     # The number of data pages that fit in this data
     num_pages = int(math.ceil(data_size/DATA_PAGE_SIZE))
-    with open(lid_filename, 'rb') as lid, open(orientation_filename, 'w') as ori:
+    with open(lid_filename, 'rb') as lid:
         header_bytes = lid.read(MAIN_HEADER_SIZE)
         header, mini_header, hss, mh_size = parse_main_header(header_bytes)
         
@@ -443,7 +469,7 @@ def parse_file(lid_filename, ori_fh, temp_fh, default_host_storage=False, debugg
         temperature_delta = datetime.timedelta(seconds=temperature_interval)
 
         # File I/O
-        ori.write(ori_csv_headers)
+        ori_fh.write(ori_csv_headers)
         tmp_buffer = StringIO()
 
         parse_data_page = get_data_page_parser(burst_delta=burst_delta, 
@@ -455,7 +481,8 @@ def parse_file(lid_filename, ori_fh, temp_fh, default_host_storage=False, debugg
                                                acl=bool(int(mini_header['ACL'])), 
                                                mgn=bool(int(mini_header['MGN'])),
                                                tri=int(mini_header['TRI']),
-                                               ori=int(mini_header['ORI']),)
+                                               ori=int(mini_header['ORI']),
+                                               bmn=int(mini_header['BMN']),)
 
 
         for page_number in xrange(num_pages):
@@ -485,13 +512,13 @@ def parse_file(lid_filename, ori_fh, temp_fh, default_host_storage=False, debugg
                             p=p, p_size=p_size, clk=clk, ori_buffer=ori_buffer,
                             tmp_buffer=tmp_buffer)
 
-            ori.write(ori_buffer.getvalue())
+            ori_fh.write(ori_buffer.getvalue())
             ori_buffer.close()
 
-    with open(temperature_filename, 'w') as tmp:
-        tmp.write(tmp_csv_headers)
-        tmp.write(tmp_buffer.getvalue())
-        tmp_buffer.close()
+            
+    temp_fh.write(tmp_csv_headers)
+    temp_fh.write(tmp_buffer.getvalue())
+    tmp_buffer.close()
 
 def main():
     if len(sys.argv) < 2:
