@@ -71,6 +71,7 @@ def parse_hss(hss_bytes):
     hss_bytes = hss_bytes[3:end_index+3]
     hss = {}
     offset = 0
+    hss_bytes = str(hss_bytes)
     while True:
         tag = hss_bytes[offset:offset+3]
         if tag == 'HSE':
