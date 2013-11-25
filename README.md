@@ -9,13 +9,23 @@ Log reader for Lowell Instrument's data logger.
   2. `$ source ve/bin/activate # may be different on windows`
   3. `$ pip install -r requirements.txt`
 2. Add this directory to your PYTHONPATH environment variable
-  1. `export PYTHONPATH=.`
-3. Run `$ bin/lid.py <filename>` to convert the binary file to a csv
+  *) Unix: `export PYTHONPATH=.`
+  *) Windows: somewhere under Control Panel is an Environment Variable setting you can modify.
+3. Add the bin directory to your PATH environment variable
+  *) Same as above except replace PYTHONPATH with PATH
+4. Run `$ lid.py <filename>` to convert the binary file to a csv
+
+# Testing
+
+To run the integration tests:
+
+1. Follow the basic usage instructions above.
+2. `$ cd matp/test`
+3. run `$ python test_integration.py`
 
 # License
 
 See LICNESE file (Simplified BSD)
-
 
 # Windows installation instructions
 
