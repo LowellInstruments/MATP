@@ -7,6 +7,12 @@ import datetime
 import sys
 from cStringIO import StringIO
 
+DEBUG=False
+
+def debug(msg):
+    if DEBUG:
+        print(msg)
+
 MAX_UNSIGNED_SHORT = 65535
 SHORT_SIGNED_MIN = -32768
 SHORT_SIGNED_MAX = 32768
@@ -376,21 +382,23 @@ def get_data_page_parser(burst_delta=None, ori_delta=None, tmp_delta=None,
 
     if tmp and acl and mgn:
         if ori <= tri:
-            print "Returning all_ori_lte_tri"
+            debug("Returning all_ori_lte_tri")
             return all_ori_lte_tri
-        print "Returning all_ori_gt_tri"
+        debug("Returning all_ori_gt_tri")
         return all_ori_gt_tri
     
     if tmp and acl and not mgn:
-        print "Returning no_m_ori_lte_tri"
+        debug("Returning no_m_ori_lte_tri")
         return no_m_ori_lte_tri
     
     if tmp and not acl and mgn:
-        print "returning no_a_ori_lte_tri"
+        debug("returning no_a_ori_lte_tri")
         return no_a_ori_lte_tri
 
         
-def parse_file(lid_filename, orientation_filename, temperature_filename, default_host_storage=False):
+def parse_file(lid_filename, ori_fh, temp_fh, default_host_storage=False, debugger=False):
+    global DEBUG
+    DEBUG = debugger
     # Microsecond is used to add a bit of time to a number to get decimal points. 
     microsecond = datetime.timedelta(microseconds=1)
 
@@ -450,7 +458,7 @@ def parse_file(lid_filename, orientation_filename, temperature_filename, default
 
 
         for page_number in xrange(num_pages):
-            print(page_number)
+            debug(page_number)
             ori_buffer = StringIO()
 
             # Seek to the start of the data page
@@ -492,7 +500,8 @@ def main():
     default_host_storage = False
     if len(sys.argv) > 2:
         default_host_storage = sys.argv[2]
-    parse_file(infile, "ori.csv", "tmp.csv", default_host_storage=default_host_storage)
+    with open("ori.csv", "w") as ori, open("tmp.csv", "w") as tmp:
+        parse_file(infile, ori, tmp, default_host_storage=default_host_storage, debugger=True)
     
 
 if __name__ == '__main__':
