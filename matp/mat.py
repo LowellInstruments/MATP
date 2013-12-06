@@ -375,7 +375,7 @@ def get_data_page_parser(burst_delta=None, ori_delta=None, tmp_delta=None,
             write_temperature(t_data, tmp_buffer=tmp_buffer, temps=temps, clk=clk,
                               tmp_delta=tmp_delta)
             write_orientation(o_data, ori_buffer=ori_buffer, clk=clk, accels=accels,
-                              manges=magnes, ori_delta=ori_delta, burst_delta=burst_delta,
+                              magnes=magnes, ori_delta=ori_delta, burst_delta=burst_delta,
                               bmn=bmn, orientation_format=orientation_format)
             clk += tmp_delta
 
