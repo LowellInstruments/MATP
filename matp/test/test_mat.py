@@ -205,14 +205,14 @@ class HSSTestCase(TimerTestCase):
         
     def test_clean_hss(self):
         '''Clean hss should return a string that starts with HSS and ends with HSE'''
-        hss = mat.clean_hss(self.header)
+        hss = mat.clean_hss(self.hss)
         self.assertEqual(hss[:3], 'HSS')
         self.assertEqual(hss[-3:], 'HSE')
         self.assertEqual(type(hss), str)
 
     def test_parse_hss(self):
         '''parse hss should return a dict of values from the HSS'''
-        hss = mat.parse_hss(self.header)
+        hss = mat.parse_hss(self.hss)
         
 
 class ParseMainHeaderTestCase(TimerTestCase):
