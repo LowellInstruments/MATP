@@ -46,11 +46,14 @@ K = 1024
 MAIN_HEADER_SIZE = 32 * K
 DATA_PAGE_SIZE = 1024 * K
 
+# Length of header tags
+TAG_LEN = 3
+
 def k_to_c(kelvin):
     '''Kelvin to celcius'''
     return kelvin - 273.15
 
-def parse_header(header_bytes, sep='\x0d\x0a'):
+def parse_header(header_bytes, sep=HEADER_SEPARATOR):
     '''Return the given bytes as a dictionary'''
     kvpairs = header_bytes.split(sep)
     return dict((str(kv).split(' ', 1) for kv in kvpairs if ' ' in kv))
@@ -58,26 +61,35 @@ def parse_header(header_bytes, sep='\x0d\x0a'):
 def mh_indicies(header_bytes):
     '''Get where the mini header starts and stops inside the main header'''
     start = header_bytes.rfind('MHS')
-    end = header_bytes.rfind('MHE') + 5
+    end = header_bytes.rfind('MHE') + 5 # +5 for MHE\x0d\x0a
     return start, end
 
+def clean_hss(hss_bytes):
+    '''Return the hss bytes between HSS and HSE'''
+    start = hss_bytes.find('HSS')
+    end = hss_bytes.rfind('HSE') + 3
+    return str(hss_bytes[start:end])
+
 def parse_hss(hss_bytes):
-    '''If there is no HSS tag use the default, otherwise parse the HSS and return it'''
+    '''If there is no HSS tag use the default, otherwise parse the HSS and return it
+    
+    This parses strings like this: "ABC13CDE41234"
+    Into this: {'ABC': 3, 'CDE': 1234}
+    '''
     if hss_bytes.find('HSS') == -1:
         return DEFAULT_HOST_STORAGE
-    # chop off the first three and chop off garbage at the end
-    end_index = hss_bytes.rfind('HSE')
-    hss_bytes = hss_bytes[3:end_index+3]
+    hss_bytes = clean_hss(hss_bytes)
     hss = {}
     offset = 0
-    hss_bytes = str(hss_bytes)
     while True:
-        tag = hss_bytes[offset:offset+3]
+        tag = hss_bytes[offset:offset+TAG_LEN]
+        if tag == 'HSS':
+            offset += 3
+            continue
         if tag == 'HSE':
             break
-        # l is the length of the value to follow
-        length = int(hss_bytes[offset+3:offset+4], 16)
-        val = hss_bytes[offset+4:offset+4+length]
+        length = int(hss_bytes[offset+TAG_LEN:offset+TAG_LEN+1], 16)
+        val = hss_bytes[offset+TAG_LEN+1:offset+TAG_LEN+1+length]
         offset += 4 + length
         hss[tag] = val
     int_tags = ['AXA','AXB', 'AYA', 'AYB', 'AZA', 'AZB', 'MXA', 'MYA', 'MZA', 'TMR', 'TMO',]

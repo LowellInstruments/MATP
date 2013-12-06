@@ -1,5 +1,6 @@
 import unittest
 import time
+import os
 
 from matp import mat
 
@@ -139,7 +140,7 @@ class GetTmpCSVHeadersTestCase(TimerTestCase):
         ori_header = mat.get_tmp_csv_headers(temp=temp)
         self.assertIn(self.datetime_header, ori_header)
         self.assertIn(self.temp, ori_header)
-        self.assertEqual(mat.LINE_BREAK, ori_header[ori_header.rfind(mat.LINE_BREAK):])
+        self.assertEqual(os.linesep, ori_header[ori_header.rfind(os.linesep):])
 
     def test_no_temp(self):
         '''should only return datetime'''
@@ -147,7 +148,7 @@ class GetTmpCSVHeadersTestCase(TimerTestCase):
         ori_header = mat.get_tmp_csv_headers(temp=temp)
         self.assertIn(self.datetime_header, ori_header)
         self.assertNotIn(self.temp, ori_header)
-        self.assertEqual(mat.LINE_BREAK, ori_header[ori_header.rfind(mat.LINE_BREAK):])
+        self.assertEqual(os.linesep, ori_header[ori_header.rfind(os.linesep):])
 
 class GetOriCSVHeadersTestCase(TimerTestCase):
     def setUp(self):
@@ -164,7 +165,7 @@ class GetOriCSVHeadersTestCase(TimerTestCase):
         self.assertIn(self.datetime_header, ori_header)
         self.assertIn(self.accel_header, ori_header)
         self.assertIn(self.magne_header, ori_header)
-        self.assertEqual(mat.LINE_BREAK, ori_header[ori_header.rfind(mat.LINE_BREAK):])
+        self.assertEqual(os.linesep, ori_header[ori_header.rfind(os.linesep):])
 
     def test_only_accel(self):
         '''Should only return time and accel headers'''
@@ -174,7 +175,7 @@ class GetOriCSVHeadersTestCase(TimerTestCase):
         self.assertIn(self.datetime_header, ori_header)
         self.assertIn(self.accel_header, ori_header)
         self.assertNotIn(self.magne_header, ori_header)
-        self.assertEqual(mat.LINE_BREAK, ori_header[ori_header.rfind(mat.LINE_BREAK):])
+        self.assertEqual(os.linesep, ori_header[ori_header.rfind(os.linesep):])
 
     def test_only_magne(self):
         '''should only return time and magne headers'''
@@ -184,7 +185,7 @@ class GetOriCSVHeadersTestCase(TimerTestCase):
         self.assertIn(self.datetime_header, ori_header)
         self.assertNotIn(self.accel_header, ori_header)
         self.assertIn(self.magne_header, ori_header)
-        self.assertEqual(mat.LINE_BREAK, ori_header[ori_header.rfind(mat.LINE_BREAK):])
+        self.assertEqual(os.linesep, ori_header[ori_header.rfind(os.linesep):])
 
     def test_neither(self):
         '''should return just the date header'''
@@ -194,12 +195,30 @@ class GetOriCSVHeadersTestCase(TimerTestCase):
         self.assertIn(self.datetime_header, ori_header)
         self.assertNotIn(self.accel_header, ori_header)
         self.assertNotIn(self.magne_header, ori_header)
-        self.assertEqual(mat.LINE_BREAK, ori_header[ori_header.rfind(mat.LINE_BREAK):])
+        self.assertEqual(os.linesep, ori_header[ori_header.rfind(os.linesep):])
+
+
+class HSSTestCase(TimerTestCase):
+    def setUp(self):
+        super(HSSTestCase, self).setUp()
+        self.hss = '4844530d0a53455220313330383032360d0a46575620312e302e3131365f41564733320d0a44504c203130340d0a444653203078383030300d0a53544d20313937302d30312d30312030303a30303a30300d0a45544d20343039362d30312d30312030303a30303a30300d0a4c454420310d0a4d48530d0a434c4b20323031332d31312d31352030393a30353a33380d0a544d5020310d0a41434c20310d0a4d474e20310d0a54524920310d0a4f52492036300d0a424d5220320d0a424d4e20320d0a42415420306536650d0a53545320303030310d0a4d48450d0a4844450d0a48535352564e3130544d4f3130544d52353130303030544d4146302e30303131323338313030333534544d4246302e30303032333439343537303733544d4346302e303030303030303834383336314158413130415842343130323441594131304159423431303234415a413130415a4234313032344d584131304d594131304d5a4131304d585331314d595331314d5a533131485345ffffffffffffff'.decode('hex')
+        
+    def test_clean_hss(self):
+        '''Clean hss should return a string that starts with HSS and ends with HSE'''
+        hss = mat.clean_hss(self.header)
+        self.assertEqual(hss[:3], 'HSS')
+        self.assertEqual(hss[-3:], 'HSE')
+        self.assertEqual(type(hss), str)
+
+    def test_parse_hss(self):
+        '''parse hss should return a dict of values from the HSS'''
+        hss = mat.parse_hss(self.header)
+        
 
 class ParseMainHeaderTestCase(TimerTestCase):
     def setUp(self):
         super(ParseMainHeaderTestCase, self).setUp()
-        self.header = '4844530d0a53455220303030340d0a46575620312e302e3039380d0a44504c20310d0a444653203078383030300d0a53544d20313937302d30312d30312030303a30303a30300d0a45544d20343039362d30312d30312030303a30303a30300d0a4c454420310d0a4d48530d0a434c4b20323031332d30372d33302031313a34353a30330d0a544d5020310d0a41434c20310d0a4d474e20310d0a5452492036300d0a4f52492036300d0a424d522031360d0a424d4e203936300d0a42415420306537300d0a53545320303030310d0a4d48450d0a4844450d0a485353544d4f0130544d52053130303030544d410f302e30303131323338313030333534544d420f302e30303032333439343537303733544d430f302e303030303030303834383336314158410130415842043130323441594101304159420431303234415a410130415a4204313032344d584101304d594101304d5a4101304d585301314d595301314d5a530131485345ffffffffffffffff'.decode('hex')
+        self.header = '4844530d0a53455220313330383032360d0a46575620312e302e3131365f41564733320d0a44504c203130340d0a444653203078383030300d0a53544d20313937302d30312d30312030303a30303a30300d0a45544d20343039362d30312d30312030303a30303a30300d0a4c454420310d0a4d48530d0a434c4b20323031332d31312d31352030393a30353a33380d0a544d5020310d0a41434c20310d0a4d474e20310d0a54524920310d0a4f52492036300d0a424d5220320d0a424d4e20320d0a42415420306536650d0a53545320303030310d0a4d48450d0a4844450d0a48535352564e3130544d4f3130544d52353130303030544d4146302e30303131323338313030333534544d4246302e30303032333439343537303733544d4346302e303030303030303834383336314158413130415842343130323441594131304159423431303234415a413130415a4234313032344d584131304d594131304d5a4131304d585331314d595331314d5a533131485345ffffffffffffff'.decode('hex')
 
     def test_header_parsing(self):
         header, mini_header, hss, mh_size = mat.parse_main_header(self.header)
@@ -236,8 +255,9 @@ class ParseMainHeaderTestCase(TimerTestCase):
                                     'MYA': '0', 
                                     'MXA': '0', 
                                     'MYS': '1', 
-                                    'TMO': '0'})
-        self.assertEqual(mh_size, 109)
+                                    'TMO': '0',
+                                    'RVN': '0'})
+        self.assertEqual(mh_size, 105)
 
     def test_no_hss_tag(self):
         hss = mat.parse_hss('blahblahblah'.encode('hex'))
