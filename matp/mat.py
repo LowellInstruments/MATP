@@ -7,7 +7,7 @@ import datetime
 import sys
 from cStringIO import StringIO
 
-DEBUG=False
+DEBUG=os.getenv('DEBUG', False)
 
 def debug(msg):
     if DEBUG:
@@ -193,45 +193,64 @@ def get_orientation_format(accel='1', magne='1'):
         number += 3
     return ','.join(fmt * number)
 
-# TODO: This looks like it needs refactoring. It's pretty non-intuitive.
-def pattern(bmn, ori=1, tri=1, tmp=True, acl=True, mgn=True):
-    '''Build the pattern for reading data.
-    This pattern is the major and all the minors up to the next major.
-    '''
-    endian = '<'
-    temp = ''
-    o = ''
-    num = 0
-    if tmp:
-        temp = 'H'
-    if acl or mgn:
-        o = 'h'
+def get_temp_patterns(ori, tri, tmp):
+    '''returns a tuple, first pattern and second pattern'''
+    if not tmp:
+        return ('', '')
+    mul = ''
+    if tri < ori:
+        mul = int(ori/tri)
+        return ('H', '%dH' % (mul-1))
+    return ('H', '')
 
+def get_ori_pattern(ori, tri, bmn, acl, mgn, size=None):
+    '''Returns the orientation pattern based on the input'''
+    if not acl and not mgn:
+        return ''
+    num = 0
     if acl:
         num += 3
     if mgn:
         num += 3
 
-    if tri < ori:
-        mul = int(ori/tri)
-        return endian + temp + str(bmn * num) + o + str(mul-1) + temp
-    mul = int(tri/ori)
-    return endian + temp + str(bmn * num * mul) + o
+    mul = 1
+    total = bmn * num
+    if tri > ori:
+        mul = int(tri/ori)
+        
+    return '%d%s' % (total * mul, 'h')
+
+def pattern(bmn, ori=1, tri=1, tmp=True, acl=True, mgn=True, size=None):
+    '''Build the pattern for reading data.
+    This pattern is the major and all the minors up to the next major.
+    '''
+    endian = '<'
+    temp_patterns = get_temp_patterns(ori, tri, tmp)
+    ori_pattern = get_ori_pattern(ori, tri, bmn, acl, mgn)
+    return '%s%s%s%s' % (endian, temp_patterns[0], ori_pattern, temp_patterns[1])
+
+def write_accellerations(acl_data, ori_buffer=None, clk=None, accels=None, ori_delta=None,
+                        burst_delta=None, bmn=None, orientation_format=None):
+    '''This function will be used when we are measuring only ACL and not MGN'''
+    pass
+
+def write_magnetometers(mgn_data, ori_buffer=None, clk=None, magnes=None, ori_delta=None,
+                        burst_delta=None, bmn=None, orientation_format=None):
+    '''This function will be used when we are measuring only MGN and not ACL'''
+    pass
 
 def write_orientation(ori_data, ori_buffer=None, clk=None, accels=None, magnes=None, ori_delta=None, 
                       burst_delta=None, bmn=None, orientation_format=None):
     '''Write the orientation data to the orientation buffer'''
-    for i in xrange(bmn):
+    for i in xrange(int(len(ori_data)/6)):
         left = 6 * i
         right = 6 * (i + 1)
         d = ori_data[left:right]
         ori_buffer.write(
-            orientation_format % (clk.isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS], 
-                                  accels[d[0]], accels[d[1]], accels[d[2]], 
-                                  magnes[d[3]], magnes[d[4]], magnes[d[5]])
-        )
-        ori_buffer.write(
-            os.linesep
+            (orientation_format+'%s') % (clk.isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS], 
+                                         accels[d[0]], accels[d[1]], accels[d[2]], 
+                                         magnes[d[3]], magnes[d[4]], magnes[d[5]],
+                                         os.linesep,)
         )
         clk += burst_delta
 
@@ -260,100 +279,31 @@ def get_data_page_parser(burst_delta=None, ori_delta=None, tmp_delta=None,
                          orientation_format=None, temps=None, 
                          accels=None, magnes=None, tmp=None, acl=None, mgn=None,
                          tri=None, ori=None, bmn=None):
-    '''Return the parser function to parse this specific type of data'''
-
-    '''This is for only a temperature measurement
-    NOTE: This is not returning yet since it's untested
+    '''Return the parser function to parse this specific type of data
+   
+    MGN: 1 or 0
+    ACL: 1 or 0
+    TMP: 1 or 0
+    TRI >= or < ORI
+    
+      MGN ACL TMP TRI comp ORI
+    *  1   1   1   >=
+    *  1   1   1   <
+    *  1   1   0   N/A
+    *  1   0   1   >=
+    *  1   0   1   <
+    *  1   0   0   N/A
+    *  0   1   1   >=
+    *  0   1   1   <
+    *  0   1   0   N/A
+    *  0   0   1   N/A
     '''
-    def tmp_only(data_page, patterns_in_page=None,
-                    p=None, p_size=None, clk=None, ori_buffer=None,
-                    tmp_buffer=None):
-        '''If there is a really large file with only a temperature measurement
-        this could be very slow since we read temps 1 at a time'''
-        for i in xrange(patterns_in_page):
-            start = i * p_size
-            stop = start + p_size
-            a = struct.unpack_from(p, data_page[start:stop])
-            
-            tmp_buffer.write(
-                "%s,%s%s" % (
-                    clk.isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS], 
-                    temps[a[0]],
-                    os.linesep,
-                )
-            )
 
-            # After each pattern, a certain time has elapsed
-            clk += tmp_delta
-
-    '''This is for no_a and tri > ori'''
-    def no_a_ori_lte_tri(data_page, patterns_in_page=None,
-                    p=None, p_size=None, clk=None, ori_buffer=None,
-                    tmp_buffer=None):
-        for i in xrange(patterns_in_page):
-            start = i * p_size
-            stop = start + p_size
-            a = struct.unpack_from(p, data_page[start:stop])
-            
-            tmp_buffer.write(
-                "%s,%s%s" % (
-                    clk.isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS], 
-                    temps[a[0]],
-                    os.linesep,
-                )
-            )
-            
-            mx = [magnes[x] for x in a[1::3]]
-            my = [magnes[x] for x in a[2::3]]
-            mz = [magnes[x] for x in a[3::3]]
-            vs = ["%s" % (clk + burst_delta * k).isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS] for k in xrange(int(len(a)/3))]
-            
-            ori_buffer.write(
-                os.linesep.join(
-                    [orientation_format % row for row in itertools.izip(vs, mx, my, mz)]
-                )
-            )
-            ori_buffer.write(os.linesep)
-            
-            # After each pattern, a certain time has elapsed
-            clk += tmp_delta
-
-    '''This is for no magnetometer and tri >= ori'''
-    def no_m_ori_lte_tri(data_page, patterns_in_page=None,
-                    p=None, p_size=None, clk=None, ori_buffer=None,
-                    tmp_buffer=None):
-        for i in xrange(patterns_in_page):
-            start = i * p_size
-            stop = start + p_size
-            a = struct.unpack_from(p, data_page[start:stop])
-            
-            tmp_buffer.write(
-                "%s,%s%s" % (
-                    clk.isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS], 
-                    temps[a[0]],
-                    os.linesep,
-                )
-            )
-            
-            ax = [accels[x] for x in a[1::3]]
-            ay = [accels[x] for x in a[2::3]]
-            az = [accels[x] for x in a[3::3]]
-            vs = ["%s" % (clk + burst_delta * k).isoformat(ISO_SEPARATOR)[:TRUNCATE_MICROSECOND_DIGITS] for k in xrange(int(len(a)/3))]
-            
-            ori_buffer.write(
-                os.linesep.join(
-                    [orientation_format % row for row in itertools.izip(vs, ax, ay, az)]
-                )
-            )
-            ori_buffer.write(os.linesep)
-            
-            # After each pattern, a certain time has elapsed
-            clk += tmp_delta
 
     '''This is for all measurements and tri >= ori'''
     def all_ori_lte_tri(data_page, patterns_in_page=None,
                     p=None, p_size=None, clk=None, ori_buffer=None,
-                    tmp_buffer=None):
+                        tmp_buffer=None, bmn=bmn):
         for i in xrange(patterns_in_page):
             start = i * p_size
             stop = start + p_size
@@ -387,6 +337,8 @@ def get_data_page_parser(burst_delta=None, ori_delta=None, tmp_delta=None,
             start = i * p_size
             stop = start + p_size
             if len(data_page[start:stop]) < p_size:
+                new_p = pattern(bmn, ori=ori, tri=tri, tmp=tmp, acl=acl, 
+                                mgn=mgn, size=len(data_page[start:stop]))
                 # get the number of remaining bytes
                 remaining = len(data_page[start:stop])
                 # get number of h bytes needed in original pattern
@@ -406,10 +358,14 @@ def get_data_page_parser(burst_delta=None, ori_delta=None, tmp_delta=None,
                 a = struct.unpack_from(new_p, data_page[start:])
             else:
                 a = struct.unpack_from(p, data_page[start:stop])
-            
+
+
             t_data = a[0:1] + a[bmn*6+1:]
             o_data = a[1:bmn * 6 + 1]
-            
+            if tri > ori:
+                t_data = a[0:1]
+                o_data = a[1:]
+    
             write_temperature(t_data, tmp_buffer=tmp_buffer, temps=temps, clk=clk,
                               tmp_delta=tmp_delta)
             write_orientation(o_data, ori_buffer=ori_buffer, clk=clk, accels=accels,
@@ -418,20 +374,7 @@ def get_data_page_parser(burst_delta=None, ori_delta=None, tmp_delta=None,
 
             clk += ori_delta
 
-    if tmp and acl and mgn:
-        if ori <= tri:
-            debug("Returning all_ori_lte_tri")
-            return all_ori_lte_tri
-        debug("Returning all_ori_gt_tri")
-        return all_ori_gt_tri
-    
-    if tmp and acl and not mgn:
-        debug("Returning no_m_ori_lte_tri")
-        return no_m_ori_lte_tri
-    
-    if tmp and not acl and mgn:
-        debug("returning no_a_ori_lte_tri")
-        return no_a_ori_lte_tri
+    return all_ori_gt_tri
 
         
 def parse_file(lid_filename, ori_fh, temp_fh, default_host_storage=False, debugger=False):

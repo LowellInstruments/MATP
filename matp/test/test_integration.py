@@ -113,8 +113,6 @@ def get_lines(fh):
 
 def main():
     for directory in find_sample_dirs('samples'):
-        if "sample4" in directory:
-            continue
         lidfile = get_file_with_ending(directory, '.lid')
         print("=== {} ===".format(lidfile))
         t, o = parse_file(lidfile)
@@ -123,12 +121,10 @@ def main():
         if len(t) != len(t_e):
             print("Line lengths are different in temperature file.")
             print("Expected: {}, Got: {}".format(len(t_e), len(t)))
-            exit(1)
         o_e = get_lines(open(o_file, 'r'))
         if len(o) != len(o_e):
             print("Line lengths are different in orientation file.")
             print("Expected: {}, Got: {}".format(len(o_e), len(o)))
-            exit(1)
         if compare_lines(t, t_e):
             print("pass")
             continue

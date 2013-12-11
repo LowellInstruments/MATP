@@ -99,6 +99,7 @@ class PatternTestCase(TimerTestCase):
         pattern = mat.pattern(bmn, tri=tri, ori=ori, acl=acl, mgn=mgn, tmp=tmp)
         self.assertEqual(pattern, expected)
 
+
 class GetOriFormatTestCase(TimerTestCase):
     def setUp(self):
         super(GetOriFormatTestCase, self).setUp()
