@@ -2,7 +2,6 @@ from __future__ import division
 import struct
 import math
 import os
-import itertools
 import datetime
 import sys
 from cStringIO import StringIO
@@ -226,6 +225,13 @@ def pattern(bmn, ori=1, tri=1, tmp=True, acl=True, mgn=True, size=None):
     endian = '<'
     temp_patterns = get_temp_patterns(ori, tri, tmp)
     ori_pattern = get_ori_pattern(ori, tri, bmn, acl, mgn)
+
+    if tri > ori:
+        return '<H%dh'
+
+    # Here is where the logic for partial patterns needs to go.
+    # Using the size, figure out how many TMP and ORI patterns you can read.
+    
     return '%s%s%s%s' % (endian, temp_patterns[0], ori_pattern, temp_patterns[1])
 
 def write_accellerations(acl_data, ori_buffer=None, clk=None, accels=None, ori_delta=None,
