@@ -100,6 +100,7 @@ class PatternTestCase(TimerTestCase):
         self.assertEqual(pattern, expected)
 
 
+
 class GetOriFormatTestCase(TimerTestCase):
     def setUp(self):
         super(GetOriFormatTestCase, self).setUp()

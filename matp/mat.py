@@ -217,7 +217,6 @@ def get_ori_pattern(ori, tri, bmn, acl, mgn, size=None):
     total = bmn * num
     if tri > ori:
         mul = int(tri/ori)
-        
     return '%d%s' % (total * mul, 'h')
 
 def pattern(bmn, ori=1, tri=1, tmp=True, acl=True, mgn=True, size=None):
