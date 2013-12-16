@@ -112,7 +112,10 @@ def get_lines(fh):
     return [line.strip() for line in fh]
 
 def main():
-    for directory in find_sample_dirs('samples'):
+    # Assumption: samples is next to this file
+    current_dir = os.path.dirname(os.path.realpath(__file__))
+    samples_dir = os.path.join(current_dir, 'samples')
+    for directory in find_sample_dirs(samples_dir):
         lidfile = get_file_with_ending(directory, '.lid')
         print("=== {} ===".format(lidfile))
         t, o = parse_file(lidfile)

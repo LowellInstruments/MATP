@@ -226,11 +226,10 @@ def pattern(bmn, ori=1, tri=1, tmp=True, acl=True, mgn=True, size=None):
     temp_patterns = get_temp_patterns(ori, tri, tmp)
     ori_pattern = get_ori_pattern(ori, tri, bmn, acl, mgn)
 
-    if tri > ori:
-        return '<H%dh'
-
     # Here is where the logic for partial patterns needs to go.
     # Using the size, figure out how many TMP and ORI patterns you can read.
+    # Note: this will probably require temp_patterns and ori_pattern to return numbers
+    #  instead of actual patterns.
     
     return '%s%s%s%s' % (endian, temp_patterns[0], ori_pattern, temp_patterns[1])
 
